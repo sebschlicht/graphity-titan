@@ -40,7 +40,7 @@ public class TitanBootstrapper extends BootstrapClient {
             userProperties = new HashMap<>();
             userProperties.put(UserProxy.PROP_IDENTIFIER,
                     String.valueOf(user.getId()));
-            vertex = _batchGraph.addVertex(null);
+            vertex = _batchGraph.addVertex(user.getId());
             nodeId = (long) vertex.getId();
             user.setNodeId(nodeId);
             numUsers += 1;
@@ -88,7 +88,7 @@ public class TitanBootstrapper extends BootstrapClient {
                         .put(StatusUpdateProxy.PROP_PUBLISHED, tsLastPost);
                 postProperties.put(StatusUpdateProxy.PROP_MESSAGE,
                         generatePostMessage(140));
-                vertex = _batchGraph.addVertex(null, postProperties);
+                vertex = _batchGraph.addVertex(tsLastPost, postProperties);
                 nodeId = (long) vertex.getId();
                 userPostNodes[iPost] = nodeId;
                 tsLastPost += 1;
