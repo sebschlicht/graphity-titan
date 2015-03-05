@@ -2,7 +2,9 @@ package de.uniko.sebschlicht.graphity.titan.model;
 
 import com.tinkerpop.blueprints.Vertex;
 
+import de.metalcon.domain.UidType;
 import de.metalcon.exceptions.ServiceOverloadedException;
+import de.uniko.sebschlicht.graphity.titan.TitanGraphity;
 import de.uniko.sebschlicht.socialnet.StatusUpdate;
 
 public class StatusUpdateProxy extends SocialItemProxy {
@@ -16,11 +18,6 @@ public class StatusUpdateProxy extends SocialItemProxy {
      * content message
      */
     public static final String PROP_MESSAGE = "message";
-
-    /**
-     * news item identifier generator
-     */
-    protected static IdGenerator ID_GENERATOR;
 
     /**
      * timestamp of publishing
@@ -38,10 +35,9 @@ public class StatusUpdateProxy extends SocialItemProxy {
     }
 
     public boolean init() {
-        //long identifier =
-        //        GraphityExtension.generateMuid(UidType.DISC).getValue();
         try {
-            long identifier = ID_GENERATOR.generate();
+            long identifier =
+                    TitanGraphity.generateMuid(UidType.DISC).getValue();
             setIdentifier(identifier);
             return true;
         } catch (ServiceOverloadedException e) {
@@ -80,21 +76,5 @@ public class StatusUpdateProxy extends SocialItemProxy {
     public StatusUpdate getStatusUpdate() {
         return new StatusUpdate(String.valueOf(pAuthor.getIdentifier()),
                 getPublished(), getMessage());
-    }
-
-    public static void setIdGenerator(IdGenerator idGenerator) {
-        ID_GENERATOR = idGenerator;
-    }
-
-    public interface IdGenerator {
-
-        /**
-         * Generates an unique news item identifier.
-         * 
-         * @return unique news item identifier
-         * @throws ServiceOverloadedException
-         *             if creating news items too frequently
-         */
-        long generate() throws ServiceOverloadedException;
     }
 }

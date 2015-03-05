@@ -1,10 +1,16 @@
 package de.uniko.sebschlicht.graphity.titan;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import com.thinkaurelius.titan.core.TitanGraph;
 import com.thinkaurelius.titan.core.schema.TitanGraphIndex;
 import com.thinkaurelius.titan.core.schema.TitanManagement;
 import com.tinkerpop.blueprints.Vertex;
 
+import de.metalcon.domain.Muid;
+import de.metalcon.domain.UidType;
+import de.metalcon.domain.helper.UidConverter;
+import de.metalcon.exceptions.ServiceOverloadedException;
 import de.uniko.sebschlicht.graphity.Graphity;
 import de.uniko.sebschlicht.graphity.exception.IllegalUserIdException;
 import de.uniko.sebschlicht.graphity.exception.UnknownFollowedIdException;
@@ -21,6 +27,21 @@ import de.uniko.sebschlicht.socialnet.StatusUpdateList;
  * 
  */
 public abstract class TitanGraphity extends Graphity {
+
+    /**
+     * unique Titan instance identifier
+     */
+    protected static byte TITAN_ID;
+
+    /**
+     * timestamp of last news item MUID creation
+     */
+    protected static int LAST_MUID_CREATION_TIME = 0;
+
+    /**
+     * id of last news item MUID
+     */
+    protected static AtomicInteger LAST_MUID_ID = new AtomicInteger(0);
 
     /**
      * Titan graph database holding the social network graph
@@ -321,4 +342,30 @@ public abstract class TitanGraphity extends Graphity {
     abstract protected StatusUpdateList readStatusUpdates(
             Vertex vReader,
             int numStatusUpdates);
+
+    public static void setTitanId(byte titanId) {
+        TITAN_ID = titanId;
+    }
+
+    public static Muid generateMuid(UidType type)
+            throws ServiceOverloadedException {
+        int timestamp = (int) (System.currentTimeMillis() / 1000);
+        short id = 0;
+        if (timestamp == LAST_MUID_CREATION_TIME) {
+            if (LAST_MUID_ID.intValue() == UidConverter.getMaximumMuidID()) {
+                // more than 65535 MUIDs / second
+                // we could separate this number by type
+                throw new ServiceOverloadedException(
+                        "Alreay created more then "
+                                + UidConverter.getMaximumMuidID()
+                                + " during the current second");
+            }
+            id = (short) LAST_MUID_ID.incrementAndGet();
+        } else {
+            LAST_MUID_ID.set(0);
+            LAST_MUID_CREATION_TIME = timestamp;
+        }
+        return Muid.createFromID(UidConverter.calculateMuidWithoutChecking(
+                type.getRawIdentifier(), TITAN_ID, timestamp, id));
+    }
 }
