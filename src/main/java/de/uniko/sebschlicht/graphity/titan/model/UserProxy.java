@@ -7,7 +7,7 @@ public class UserProxy extends SocialItemProxy {
     /**
      * timestamp of last stream update
      */
-    public static final String PROP_LAST_STREAM_UDPATE = "stream_update";
+    public static final String PROP_LAST_STREAM_UDPATE = "last_post";
 
     /**
      * (optional) last recent status update posted by this user

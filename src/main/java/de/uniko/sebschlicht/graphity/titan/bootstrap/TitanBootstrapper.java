@@ -5,8 +5,11 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.thinkaurelius.titan.core.Multiplicity;
+import com.thinkaurelius.titan.core.PropertyKey;
 import com.thinkaurelius.titan.core.TitanFactory;
 import com.thinkaurelius.titan.core.TitanGraph;
+import com.thinkaurelius.titan.core.schema.TitanManagement;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.util.wrappers.batch.BatchGraph;
 import com.tinkerpop.blueprints.util.wrappers.batch.VertexIDType;
@@ -24,6 +27,33 @@ public class TitanBootstrapper extends BootstrapClient {
     public TitanBootstrapper(
             String configPath) {
         TitanGraph graph = TitanFactory.open(configPath);
+        TitanManagement mgmt = graph.getManagementSystem();
+
+        // create edge labels
+        mgmt.makeEdgeLabel(EdgeType.PUBLISHED.getLabel())
+                .multiplicity(Multiplicity.SIMPLE).make();
+        mgmt.makeEdgeLabel(EdgeType.FOLLOWS.getLabel())
+                .multiplicity(Multiplicity.MULTI).make();
+        mgmt.makeEdgeLabel(EdgeType.GRAPHITY.getLabel())
+                .multiplicity(Multiplicity.SIMPLE).make();
+        mgmt.makeEdgeLabel(EdgeType.REPLICA.getLabel())
+                .multiplicity(Multiplicity.MULTI).make();
+
+        // create vertex properties and indices
+        PropertyKey userIdKey =
+                mgmt.makePropertyKey(UserProxy.PROP_IDENTIFIER)
+                        .dataType(Long.class).make();
+        mgmt.makePropertyKey(UserProxy.PROP_LAST_STREAM_UDPATE)
+                .dataType(Long.class).make();
+        mgmt.makePropertyKey(StatusUpdateProxy.PROP_PUBLISHED)
+                .dataType(Long.class).make();
+        mgmt.makePropertyKey(StatusUpdateProxy.PROP_MESSAGE)
+                .dataType(String.class).make();
+
+        // create user identifier index
+        mgmt.buildIndex("user.id", Vertex.class).addKey(userIdKey).unique()
+                .buildCompositeIndex();
+
         _batchGraph = new BatchGraph<>(graph, VertexIDType.NUMBER, 10000);
     }
 
