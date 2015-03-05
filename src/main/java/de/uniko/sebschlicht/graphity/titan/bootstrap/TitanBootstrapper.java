@@ -54,6 +54,8 @@ public class TitanBootstrapper extends BootstrapClient {
         mgmt.buildIndex("user.id", Vertex.class).addKey(userIdKey).unique()
                 .buildCompositeIndex();
 
+        mgmt.commit();
+
         _batchGraph = new BatchGraph<>(graph, VertexIDType.NUMBER, 10000);
     }
 
@@ -68,9 +70,8 @@ public class TitanBootstrapper extends BootstrapClient {
         Map<String, Object> userProperties;
         for (User user : _users.getUsers()) {
             userProperties = new HashMap<>();
-            userProperties.put(UserProxy.PROP_IDENTIFIER,
-                    String.valueOf(user.getId()));
-            vertex = _batchGraph.addVertex(user.getId());
+            userProperties.put(UserProxy.PROP_IDENTIFIER, user.getId());
+            vertex = _batchGraph.addVertex(user.getId(), userProperties);
             nodeId = (long) vertex.getId();
             user.setNodeId(nodeId);
             numUsers += 1;
