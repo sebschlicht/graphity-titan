@@ -1,6 +1,10 @@
 package de.uniko.sebschlicht.graphity.titan.model;
 
+import com.tinkerpop.blueprints.Direction;
 import com.tinkerpop.blueprints.Vertex;
+
+import de.uniko.sebschlicht.graphity.titan.EdgeType;
+import de.uniko.sebschlicht.graphity.titan.Walker;
 
 public class UserProxy extends SocialItemProxy {
 
@@ -36,5 +40,25 @@ public class UserProxy extends SocialItemProxy {
             _lastPostTimestamp = (value == null) ? 0L : value;
         }
         return _lastPostTimestamp;
+    }
+
+    public void addStatusUpdate(StatusUpdateProxy statusUpdate) {
+        statusUpdate.setAuthor(this);
+        /**
+         * update news item list
+         */
+        // get last recent news item
+        Vertex lastUpdate =
+                Walker.nextVertex(vertex, EdgeType.PUBLISHED.getLabel());
+        // update references to previous news item (if existing)
+        if (lastUpdate != null) {
+            Walker.removeSingleEdge(vertex, Direction.OUT,
+                    EdgeType.PUBLISHED.getLabel());
+            statusUpdate.getVertex().addEdge(EdgeType.PUBLISHED.getLabel(),
+                    lastUpdate);
+        }
+        // link from user to news item vertex
+        vertex.addEdge(EdgeType.PUBLISHED.getLabel(), statusUpdate.getVertex());
+        setLastPostTimestamp(statusUpdate.getPublished());
     }
 }

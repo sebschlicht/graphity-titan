@@ -7,10 +7,16 @@ import de.metalcon.exceptions.ServiceOverloadedException;
 import de.uniko.sebschlicht.graphity.titan.TitanGraphity;
 import de.uniko.sebschlicht.socialnet.StatusUpdate;
 
+/**
+ * News item vertex wrapper.
+ * 
+ * @author sebschlicht
+ * 
+ */
 public class StatusUpdateProxy extends SocialItemProxy {
 
     /**
-     * date and time the activity was published
+     * date and time the news item was published
      */
     public static final String PROP_PUBLISHED = "published";
 
@@ -34,15 +40,16 @@ public class StatusUpdateProxy extends SocialItemProxy {
         super(vStatusUpdate);
     }
 
-    public boolean init() {
+    public void initVertex(long published, String message) {
         try {
             long identifier =
                     TitanGraphity.generateMuid(UidType.DISC).getValue();
             setIdentifier(identifier);
-            return true;
         } catch (ServiceOverloadedException e) {
             throw new IllegalStateException(e);
         }
+        setPublished(published);
+        setMessage(message);
     }
 
     public void setAuthor(UserProxy pAuthor) {
@@ -60,6 +67,12 @@ public class StatusUpdateProxy extends SocialItemProxy {
         return published;
     }
 
+    /**
+     * Stores the creation timestamp in vertex and cache.
+     * 
+     * @param published
+     *            timestamp of creation
+     */
     public void setPublished(long published) {
         vertex.setProperty(PROP_PUBLISHED, published);
         this.published = published;
@@ -69,6 +82,12 @@ public class StatusUpdateProxy extends SocialItemProxy {
         return (String) vertex.getProperty(PROP_MESSAGE);
     }
 
+    /**
+     * Stores the content message in vertex.
+     * 
+     * @param message
+     *            content message
+     */
     public void setMessage(String message) {
         vertex.setProperty(PROP_MESSAGE, message);
     }
