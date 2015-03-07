@@ -137,7 +137,7 @@ public class TitanBootstrapper extends BootstrapClient {
             }
             //TODO we could create posts first and could save the timestamp for user instead
             // update last_post
-            _batchGraph.getVertex(user.getId()).setProperty(
+            _batchGraph.getVertex(user.getNodeId()).setProperty(
                     UserProxy.PROP_LAST_STREAM_UDPATE, tsLastPost);
         }
         return numTotalPosts;
