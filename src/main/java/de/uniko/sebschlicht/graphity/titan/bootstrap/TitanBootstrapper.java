@@ -161,6 +161,17 @@ public class TitanBootstrapper extends BootstrapClient {
         return numTotalPosts;
     }
 
+    private static boolean IS_SHUT_DOWN = false;
+
+    private static void shutdown(TitanBootstrapper bootstrapClient) {
+        if (!IS_SHUT_DOWN) {
+            System.out.println("process finished. making persistent...");
+            bootstrapClient.shutdown();
+            System.out.println("exited.");
+            IS_SHUT_DOWN = true;
+        }
+    }
+
     public static void main(String[] args) throws IOException {
         if (args.length != 2) {
             System.out
@@ -169,6 +180,7 @@ public class TitanBootstrapper extends BootstrapClient {
         }
         File fBootstrapLog = new File(args[0]);
         File fConfiguration = new File(args[1]);
+        // only one bootstrap client shall run at once!
         final TitanBootstrapper bootstrapClient =
                 new TitanBootstrapper(fConfiguration.getAbsolutePath());
 
@@ -176,12 +188,11 @@ public class TitanBootstrapper extends BootstrapClient {
 
             @Override
             public void run() {
-                System.out.println("process finished. making persistent...");
-                bootstrapClient.shutdown();
-                System.out.println("exited.");
+                shutdown(bootstrapClient);
             }
         });
         System.out.println("database ready.");
         bootstrapClient.bootstrap(fBootstrapLog);
+        shutdown(bootstrapClient);
     }
 }
