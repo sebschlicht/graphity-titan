@@ -22,6 +22,8 @@ import de.uniko.sebschlicht.graphity.titan.model.UserProxy;
 
 public class TitanBootstrapper extends BootstrapClient {
 
+    private long _edgeId;
+
     private BatchGraph<TitanGraph> _batchGraph;
 
     public TitanBootstrapper(
@@ -56,6 +58,7 @@ public class TitanBootstrapper extends BootstrapClient {
 
         mgmt.commit();
 
+        _edgeId = 0;
         _batchGraph = new BatchGraph<>(graph, VertexIDType.NUMBER, 10000);
     }
 
@@ -93,7 +96,11 @@ public class TitanBootstrapper extends BootstrapClient {
                     User followed = _users.getUser(idFollowed);
                     outVertex = _batchGraph.getVertex(user.getId());
                     inVertex = _batchGraph.getVertex(followed.getId());
-                    _batchGraph.addEdge(null, outVertex, inVertex,
+                    if (outVertex == null || inVertex == null) {
+                        throw new IllegalStateException(
+                                "user vertex is missing");
+                    }
+                    _batchGraph.addEdge(_edgeId++, outVertex, inVertex,
                             EdgeType.FOLLOWS.getLabel());
                     numSubscriptions += 1;
                 }
@@ -147,7 +154,11 @@ public class TitanBootstrapper extends BootstrapClient {
                 if (iPost + 1 < postNodeIds.length) {// newerPost -> olderPost
                     outVertex = _batchGraph.getVertex(postNodeIds[iPost + 1]);
                     inVertex = _batchGraph.getVertex(postNodeIds[iPost]);
-                    _batchGraph.addEdge(null, outVertex, inVertex,
+                    if (outVertex == null || inVertex == null) {
+                        throw new IllegalStateException(
+                                "news item vertex is missing");
+                    }
+                    _batchGraph.addEdge(_edgeId++, outVertex, inVertex,
                             EdgeType.PUBLISHED.getLabel());
                 } else {// user -> newestPost
                     outVertex = _batchGraph.getVertex(user.getNodeId());
