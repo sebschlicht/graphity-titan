@@ -166,6 +166,10 @@ public class TitanBootstrapper extends BootstrapClient {
                 } else {// user -> newestPost
                     outVertex = _batchGraph.getVertex(user.getNodeId());
                     inVertex = _batchGraph.getVertex(postNodeIds[iPost]);
+                    if (outVertex == null || inVertex == null) {
+                        throw new IllegalStateException(
+                                "user or news item vertex is missing");
+                    }
                     _batchGraph.addEdge(_edgeId++, outVertex, inVertex,
                             EdgeType.PUBLISHED.getLabel());
                 }
