@@ -22,6 +22,8 @@ import de.uniko.sebschlicht.graphity.titan.model.UserProxy;
 
 public class TitanBootstrapper extends BootstrapClient {
 
+    private long _vertexId;
+
     private long _edgeId;
 
     private BatchGraph<TitanGraph> _batchGraph;
@@ -58,7 +60,8 @@ public class TitanBootstrapper extends BootstrapClient {
 
         mgmt.commit();
 
-        _edgeId = 0;
+        _vertexId = 1;
+        _edgeId = 1;
         _batchGraph = new BatchGraph<>(graph, VertexIDType.NUMBER, 10000);
     }
 
@@ -74,7 +77,7 @@ public class TitanBootstrapper extends BootstrapClient {
         for (User user : _users.getUsers()) {
             userProperties = new HashMap<>();
             userProperties.put(UserProxy.PROP_IDENTIFIER, user.getId());
-            vertex = _batchGraph.addVertex(user.getId(), userProperties);
+            vertex = _batchGraph.addVertex(_vertexId++, userProperties);
             nodeId = (long) vertex.getId();
             user.setNodeId(nodeId);
             numUsers += 1;
@@ -94,8 +97,8 @@ public class TitanBootstrapper extends BootstrapClient {
             if (!IS_GRAPHITY) {// WriteOptimizedGraphity
                 for (long idFollowed : subscriptions) {
                     User followed = _users.getUser(idFollowed);
-                    outVertex = _batchGraph.getVertex(user.getId());
-                    inVertex = _batchGraph.getVertex(followed.getId());
+                    outVertex = _batchGraph.getVertex(user.getNodeId());
+                    inVertex = _batchGraph.getVertex(followed.getNodeId());
                     if (outVertex == null || inVertex == null) {
                         throw new IllegalStateException(
                                 "user vertex is missing");
@@ -126,7 +129,7 @@ public class TitanBootstrapper extends BootstrapClient {
                         .put(StatusUpdateProxy.PROP_PUBLISHED, tsLastPost);
                 postProperties.put(StatusUpdateProxy.PROP_MESSAGE,
                         generatePostMessage(140));
-                vertex = _batchGraph.addVertex(tsLastPost, postProperties);
+                vertex = _batchGraph.addVertex(_vertexId++, postProperties);
                 nodeId = (long) vertex.getId();
                 userPostNodes[iPost] = nodeId;
                 tsLastPost += 1;
@@ -163,7 +166,7 @@ public class TitanBootstrapper extends BootstrapClient {
                 } else {// user -> newestPost
                     outVertex = _batchGraph.getVertex(user.getNodeId());
                     inVertex = _batchGraph.getVertex(postNodeIds[iPost]);
-                    _batchGraph.addEdge(null, outVertex, inVertex,
+                    _batchGraph.addEdge(_edgeId++, outVertex, inVertex,
                             EdgeType.PUBLISHED.getLabel());
                 }
             }
