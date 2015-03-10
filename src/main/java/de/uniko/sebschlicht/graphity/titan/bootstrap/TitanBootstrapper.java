@@ -62,7 +62,7 @@ public class TitanBootstrapper extends BootstrapClient {
 
         _vertexId = 1;
         _edgeId = 1;
-        _batchGraph = new BatchGraph<>(graph, VertexIDType.NUMBER, 10000);
+        _batchGraph = new BatchGraph<>(graph, VertexIDType.NUMBER, 100000);
     }
 
     public void shutdown() {
