@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>de.uniko.sebschlicht</groupId>
   <artifactId>graphity-titan</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.1.0-SNAPSHOT</version>
   
   <name>Graphity@Titan</name>
   <description>Graphity implementation using Titan.</description>
@@ -36,7 +36,7 @@
     <!-- dependency versions: production -->
     <titan.version>0.5.0</titan.version>
     <metalcon.muid>0.4.2</metalcon.muid>
-    <socialnet.version>0.2.0-SNAPSHOT</socialnet.version>
+    <socialnet.version>0.5.0-SNAPSHOT</socialnet.version>
   </properties>
 
   <dependencies>
