@@ -26,11 +26,16 @@ public class ReadOptimizedGraphity extends TitanGraphity {
     @Override
     protected boolean addFollowship(Vertex vFollowing, Vertex vFollowed) {
         // try to find the replica node of the user followed
+        Vertex vUserFollowed;
         for (Vertex vFollowedReplica : vFollowing.getVertices(Direction.OUT,
                 EdgeType.FOLLOWS.getLabel())) {
-            if (Walker
-                    .nextVertex(vFollowedReplica, EdgeType.REPLICA.getLabel())
-                    .equals(vFollowed)) {
+            vUserFollowed =
+                    Walker.nextVertex(vFollowedReplica,
+                            EdgeType.REPLICA.getLabel());
+            if (vUserFollowed == null) {// concurrent graph modification
+                continue;
+            }
+            if (vUserFollowed.equals(vFollowed)) {
                 // user is already following this user
                 return false;
             }
@@ -108,12 +113,16 @@ public class ReadOptimizedGraphity extends TitanGraphity {
     @Override
     protected boolean removeFollowship(Vertex vFollowing, Vertex vFollowed) {
         // find the replica node of the user followed
-        Vertex vReplica = null;
+        Vertex vUserFollowed, vReplica = null;
         for (Vertex vFollowedReplica : vFollowing.getVertices(Direction.OUT,
                 EdgeType.FOLLOWS.getLabel())) {
-            if (Walker
-                    .nextVertex(vFollowedReplica, EdgeType.REPLICA.getLabel())
-                    .equals(vFollowed)) {
+            vUserFollowed =
+                    Walker.nextVertex(vFollowedReplica,
+                            EdgeType.REPLICA.getLabel());
+            if (vUserFollowed == null) {//concurrent graph modification
+                continue;
+            }
+            if (vUserFollowed.equals(vFollowed)) {
                 vReplica = vFollowedReplica;
                 break;
             }
