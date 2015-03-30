@@ -142,10 +142,18 @@ public class ReadOptimizedGraphity extends TitanGraphity {
             followingUser =
                     Walker.previousVertex(followedReplica,
                             EdgeType.FOLLOWS.getLabel());
+            if (followingUser == null) {// concurrent graph modifcation
+                continue;
+            }
+
             // bridge user node
             prevReplica =
                     Walker.previousVertex(followedReplica,
                             EdgeType.GRAPHITY.getLabel());
+            if (prevReplica == null) {// concurrent graph modifcation
+                continue;
+            }
+
             if (!prevReplica.equals(followingUser)) {
                 Walker.removeSingleEdge(followedReplica, Direction.IN,
                         EdgeType.GRAPHITY.getLabel());
