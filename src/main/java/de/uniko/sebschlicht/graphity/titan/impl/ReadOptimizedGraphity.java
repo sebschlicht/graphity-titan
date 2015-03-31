@@ -295,7 +295,7 @@ public class ReadOptimizedGraphity extends TitanGraphity {
     private static long getLastUpdateByReplica(final Vertex userReplica) {
         final Vertex user =
                 Walker.nextVertex(userReplica, EdgeType.REPLICA.getLabel());
-        if (user == null) {// concurrent modification
+        if (user == null) {// concurrent graph modification
             return 0;
         }
         UserProxy pUser = new UserProxy(user);

@@ -4,6 +4,8 @@ import com.tinkerpop.blueprints.Direction;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Vertex;
 
+import de.uniko.sebschlicht.graphity.titan.model.VersionedEdge;
+
 /**
  * graph walker for Titan
  * 
@@ -28,6 +30,25 @@ public abstract class Walker {
             return destinationNode;
         }
         return null;
+    }
+
+    /**
+     * Walks along the most recent edge of an edge type to the next vertex.
+     * 
+     * @param sourceVertex
+     *            vertex to start from
+     * @param edgeLabel
+     *            label of the edge to walk along
+     * @return vertex the most recent edge specified directs to<br>
+     *         <b>null</b> - if the start vertex has no such edge directing out
+     */
+    public static Vertex nextMostRecentVertex(
+            Vertex sourceVertex,
+            String edgeLabel) {
+        VersionedEdge mostRecentEdge =
+                getMostRecentEdge(sourceVertex, Direction.OUT, edgeLabel);
+        return (mostRecentEdge != null) ? mostRecentEdge.getEdge().getVertex(
+                Direction.IN) : null;
     }
 
     /**
@@ -67,5 +88,46 @@ public abstract class Walker {
             edge.remove();
             break;
         }
+    }
+
+    /**
+     * Removes the most recent edge matching the given criteria retrieved by
+     * <i>getEdges</i>.
+     * 
+     * @param sourceVertex
+     *            vertex to start from
+     * @param direction
+     *            direction the edge has for source vertex
+     * @param edgeLabel
+     *            label of the edge to remove
+     */
+    public static void removeMostRecentEdge(
+            Vertex sourceVertex,
+            Direction direction,
+            String edgeLabel) {
+        VersionedEdge mostRecentEdge =
+                getMostRecentEdge(sourceVertex, direction, edgeLabel);
+        if (mostRecentEdge != null) {
+            mostRecentEdge.getEdge().remove();
+        }
+    }
+
+    public static VersionedEdge getMostRecentEdge(
+            Vertex sourceVertex,
+            Direction direction,
+            String edgeLabel) {
+        //TODO should we use vertex-centric indices?
+        VersionedEdge mostRecentEdge = null;
+        for (Edge edge : sourceVertex.getEdges(direction, edgeLabel)) {
+            if (mostRecentEdge == null) {// first edge
+                mostRecentEdge = new VersionedEdge(edge);
+            } else {// n-th edge
+                VersionedEdge crrEdge = new VersionedEdge(edge);
+                if (crrEdge.getTimestamp() > mostRecentEdge.getTimestamp()) {
+                    mostRecentEdge = crrEdge;
+                }
+            }
+        }
+        return mostRecentEdge;
     }
 }
