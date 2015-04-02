@@ -11,6 +11,7 @@ import de.uniko.sebschlicht.graphity.titan.Walker;
 import de.uniko.sebschlicht.graphity.titan.model.UserProxy;
 import de.uniko.sebschlicht.graphity.titan.model.VersionedEdge;
 import de.uniko.sebschlicht.graphity.titan.requests.ServiceRequestFollow;
+import de.uniko.sebschlicht.graphity.titan.requests.ServiceRequestUnfollow;
 
 public class ReadOptimizedECGraphity extends TitanGraphity {
 
@@ -73,21 +74,83 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
                 request.getFollowedVertex());
 
         // insert replica in subsriber's ego network
-        insertIntoEgoNetwork(request.getSubscriberVertex(), rFollowed,
+        insertIntoReplicaLayer(request.getSubscriberVertex(), rFollowed,
                 request.getTimestamp());
         return true;
     }
 
-    protected void insertIntoEgoNetwork(
+    public boolean removeFollowship(ServiceRequestUnfollow request) {
+        // try to find the replica node of the user followed
+        Vertex vUserFollowed, rFollowed = null;
+        for (Vertex vFollowedReplica : request.getSubscriberVertex()
+                .getVertices(Direction.OUT, EdgeType.FOLLOWS.getLabel())) {
+            /*
+             * In an EC storage backend there may be FOLLOWS edges that point to
+             * multiple replicas of the same user.
+             * <br>
+             * In the subscription removal process we should be aware of replica
+             * duplicates and remove all subscriptions to a user at once.
+             */
+            /*
+             * A replica will never have multiple REPLICA edges.
+             */
+            vUserFollowed =
+                    Walker.nextVertex(vFollowedReplica,
+                            EdgeType.REPLICA.getLabel());
+
+            /*
+             * Another request may add a subscription to the subscriber
+             * concurrently.
+             * We don't need to care, because the worst case is that it is the
+             * same subscription we want to remove.
+             * In production, we don't expect this to happen.
+             * In our evaluation this case is rare but there is a chance.
+             */
+            if (vUserFollowed == null) {
+                continue;
+            }
+            if (vUserFollowed.equals(request.getSubscriberVertex())) {
+                rFollowed = vFollowedReplica;
+                break;
+            }
+        }
+        if (rFollowed == null) {// there is no such followship existing
+            return false;
+        }
+        if (removeFromReplicaLayer(rFollowed, request.getTimestamp())) {
+            // remove the followship
+            Walker.removeSingleEdge(rFollowed, Direction.OUT,
+                    EdgeType.REPLICA.getLabel());
+            Walker.removeSingleEdge(rFollowed, Direction.IN,
+                    EdgeType.FOLLOWS.getLabel());
+            // remove the replica node
+            rFollowed.remove();
+        }
+        return true;
+    }
+
+    /**
+     * Inserts a replica into the replica layer of a user.
+     * After the insertion, the replica will be linked properly in the replica
+     * layer, according to the Graphity index.
+     * 
+     * @param vSubscriber
+     *            user vertex
+     * @param rFollowed
+     *            replica vertex
+     * @param timestamp
+     *            request timestamp
+     */
+    protected static void insertIntoReplicaLayer(
             Vertex vSubscriber,
             Vertex rFollowed,
             long timestamp) {
         if (Walker.nextVertex(vSubscriber, EdgeType.GRAPHITY.getLabel()) == null) {
             // very first subscription of the subscriber
             /*
-             * Concurrent subscription creation for the same user may create two
-             * GRAPHITY edges starting from the subscriber to two replicas.
-             * <br>
+             * Concurrent first subscription creation for the same user may
+             * create two GRAPHITY edges starting from the subscriber to two
+             * replicas.<br>
              * We can easily fix this problem by removing every but the most
              * recent GRAPHITY edge of a user whenever we see more than one.
              * We could either
@@ -142,6 +205,59 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
     }
 
     /**
+     * Removes a replica from the replica layer of a user.
+     * After the removal, other replicas will still be linked properly in the
+     * replica layer, according to the Graphity index.
+     * 
+     * @param rFollowed
+     *            replica vertex
+     * @param timestamp
+     *            request timestamp
+     */
+    protected static boolean removeFromReplicaLayer(
+            Vertex rFollowed,
+            long timestamp) {
+        /*
+         * There may be more than one Graphity edge leading in, if previous
+         * requests modified the graph concurrently. We are aware of this
+         * possible state and work with the most recent one.
+         */
+        final Vertex prev =
+                Walker.previousMostRecentVertex(rFollowed,
+                        EdgeType.GRAPHITY.getLabel());
+
+        /*
+         * Two states can cause, that the previous replica isn't existing:<br>
+         * 1. The subscription has just been created and the replica was not yet
+         * inserted in the subscriber's replica layer.
+         * 2. [?] Another subscription removal process is removing the same
+         * subscription and decided to remove the replica from the replica layer
+         * before disconnecting it.
+         * However, we will just exit and let the concurrent request win.
+         */
+        if (prev == null) {
+            //TODO this actually never happened! let's see if it occurs
+            //return false;
+        }
+
+        final Vertex next =
+                Walker.nextMostRecentVertex(rFollowed,
+                        EdgeType.GRAPHITY.getLabel());
+
+        // bridge the user replica in the replica layer
+        Walker.removeMostRecentEdge(prev, Direction.OUT,
+                EdgeType.GRAPHITY.getLabel());
+        if (next != null) {
+            Walker.removeMostRecentEdge(next, Direction.IN,
+                    EdgeType.GRAPHITY.getLabel());
+            Edge edge = prev.addEdge(EdgeType.GRAPHITY.getLabel(), next);
+            VersionedEdge verEdge = new VersionedEdge(edge);
+            verEdge.setTimestamp(timestamp);
+        }
+        return true;
+    }
+
+    /**
      * Retrieves the timestamp of the last recent status update of the user
      * specified.
      * 
@@ -153,11 +269,12 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
         final Vertex user =
                 Walker.nextVertex(rUser, EdgeType.REPLICA.getLabel());
         /*
-         * We have no idea why a replica node can be unconnected to the user,
-         * but be in any user's replica layer.
-         * Nevertheless, it can.
+         * We have no idea why a replica node can be unconnected to the user
+         * and be in any user's replica layer at the same time.
+         * Nevertheless, we frequently observe this state, causing NPEs.
          */
         if (user == null) {
+            // replica is unconnected, thus can not have status updates now
             return 0;
         }
         UserProxy pUser = new UserProxy(user);

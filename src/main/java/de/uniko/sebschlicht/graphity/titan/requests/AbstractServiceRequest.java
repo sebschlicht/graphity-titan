@@ -21,4 +21,14 @@ public abstract class AbstractServiceRequest extends Request {
     public long getTimestamp() {
         return _timestamp;
     }
+
+    /**
+     * not implemented
+     * 
+     * @return null
+     */
+    @Override
+    public String[] toStringArray() {
+        return null;
+    }
 }
