@@ -8,6 +8,7 @@ import com.tinkerpop.blueprints.Vertex;
 import de.uniko.sebschlicht.graphity.titan.EdgeType;
 import de.uniko.sebschlicht.graphity.titan.TitanGraphity;
 import de.uniko.sebschlicht.graphity.titan.Walker;
+import de.uniko.sebschlicht.graphity.titan.model.StatusUpdateProxy;
 import de.uniko.sebschlicht.graphity.titan.model.UserProxy;
 import de.uniko.sebschlicht.graphity.titan.model.VersionedEdge;
 import de.uniko.sebschlicht.graphity.titan.requests.FollowServiceRequest;
@@ -131,7 +132,22 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
     }
 
     public long addStatusUpdate(PostServiceRequest request) {
+        // create new status update vertex and fill via proxy
+        Vertex crrUpdate = graphDb.addVertex(null);
+        StatusUpdateProxy pStatusUpdate = new StatusUpdateProxy(crrUpdate);
+        //TODO handle service overload
+        pStatusUpdate.initVertex(request.getStatusUpdate().getPublished(),
+                request.getStatusUpdate().getMessage());
+        //FIXME do we need EC algorithms for proxy algorithms, too?
 
+        // add status update to author (link vertex, update user)
+        UserProxy pAuthor = new UserProxy(request.getAuthorVertex());
+        pAuthor.addStatusUpdate(pStatusUpdate);
+
+        // update replica layers of the author's followers
+        updateReplicaLayers(request.getAuthorVertex(), request.getTimestamp());
+
+        return pStatusUpdate.getIdentifier();
     }
 
     /**
@@ -260,6 +276,128 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
             verEdge.setTimestamp(timestamp);
         }
         return true;
+    }
+
+    /**
+     * Updates the replica layers of all subscribers of a user.
+     * After the update the user is at the first position of all of its
+     * subscriber's replica layers.
+     * 
+     * @param vUser
+     *            user vertex
+     * @param timestamp
+     *            request timestamp
+     */
+    protected static void updateReplicaLayers(Vertex vUser, long timestamp) {
+        // loop through followers
+        /*
+         * There may be multiple subscriptions to the same user.
+         */
+        Vertex vSubscriber, rPrevAuthor;
+        Vertex prevReplica, nextReplica;
+        for (Vertex rFollowed : vUser.getVertices(Direction.IN,
+                EdgeType.REPLICA.getLabel())) {
+            // load each replica and the user corresponding
+            /*
+             * A replica can not have multiple FOLLOWS edges.
+             */
+            vSubscriber =
+                    Walker.previousVertex(rFollowed,
+                            EdgeType.FOLLOWS.getLabel());
+            /*
+             * The replica might be unconnected from its user, if another
+             * request removes this subscription concurrently.
+             * In this case we don't need to care for this user at this time.
+             */
+            if (vSubscriber == null) {
+                continue;
+            }
+
+            // bridge user node
+            /*
+             * There might be multiple GRAPHITY edges if previous requests
+             * damaged the graph schema.
+             */
+            prevReplica =
+                    Walker.previousMostRecentVertex(rFollowed,
+                            EdgeType.GRAPHITY.getLabel());
+            /*
+             * There might be no previous replica in the replica layer if
+             * another request removes the subscription concurrently.
+             * In this case we do not need to care for this user at this time.
+             */
+            if (prevReplica == null) {
+                continue;
+            }
+
+            if (!prevReplica.equals(vSubscriber)) {
+                /*
+                 * There might be multiple GRAPHITY edges due to concurrent
+                 * requests.
+                 * We remove the most recent one.
+                 */
+                Walker.removeMostRecentEdge(rFollowed, Direction.IN,
+                        EdgeType.GRAPHITY.getLabel());
+                /*
+                 * There might be multiple GRAPHITY edges due to concurrent
+                 * requests.
+                 * We walk along the most recent one.
+                 */
+                nextReplica =
+                        Walker.nextMostRecentVertex(rFollowed,
+                                EdgeType.GRAPHITY.getLabel());
+                if (nextReplica != null) {
+                    /*
+                     * There might be multiple GRAPHITY edges due to concurrent
+                     * requests.
+                     * We remove the most recent one.
+                     */
+                    Walker.removeMostRecentEdge(rFollowed, Direction.OUT,
+                            EdgeType.GRAPHITY.getLabel());
+                    /*
+                     * Reconnect the next replica with a new versioned GRAPHITY
+                     * edge.
+                     */
+                    Edge edge =
+                            prevReplica.addEdge(EdgeType.GRAPHITY.getLabel(),
+                                    nextReplica);
+                    VersionedEdge verEdge = new VersionedEdge(edge);
+                    verEdge.setTimestamp(timestamp);
+                }
+                // insert user's replica at its new position
+                /*
+                 * There might be multiple GRAPHITY edges due to concurrent
+                 * requests.
+                 * We walk along the most recent one.
+                 */
+                rPrevAuthor =
+                        Walker.nextMostRecentVertex(vSubscriber,
+                                EdgeType.GRAPHITY.getLabel());
+                if (!rPrevAuthor.equals(rFollowed)) {
+                    /*
+                     * There might be multiple GRAPHITY edges due to concurrent
+                     * requests.
+                     * We remove the most recent one.
+                     */
+                    Walker.removeMostRecentEdge(vSubscriber, Direction.OUT,
+                            EdgeType.GRAPHITY.getLabel());
+                    /*
+                     * Reconnect the previous replica with a new versioned
+                     * GRAPHITY edge.
+                     */
+                    Edge edge =
+                            vSubscriber.addEdge(EdgeType.GRAPHITY.getLabel(),
+                                    rFollowed);
+                    VersionedEdge verEdge = new VersionedEdge(edge);
+                    verEdge.setTimestamp(timestamp);
+                    edge =
+                            rFollowed.addEdge(EdgeType.GRAPHITY.getLabel(),
+                                    rPrevAuthor);
+                    verEdge = new VersionedEdge(edge);
+                    verEdge.setTimestamp(timestamp);
+                }
+            }
+        }
     }
 
     /**

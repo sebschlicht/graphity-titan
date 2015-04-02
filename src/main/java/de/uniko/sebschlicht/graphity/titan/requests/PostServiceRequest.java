@@ -22,4 +22,12 @@ public class PostServiceRequest extends ServiceRequest {
     public Vertex getAuthorVertex() {
         return _vAuthor;
     }
+
+    public void setStatusUpdate(StatusUpdate statusUpdate) {
+        _statusUpdate = statusUpdate;
+    }
+
+    public StatusUpdate getStatusUpdate() {
+        return _statusUpdate;
+    }
 }
