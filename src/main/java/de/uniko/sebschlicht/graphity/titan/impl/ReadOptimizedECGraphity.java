@@ -10,8 +10,9 @@ import de.uniko.sebschlicht.graphity.titan.TitanGraphity;
 import de.uniko.sebschlicht.graphity.titan.Walker;
 import de.uniko.sebschlicht.graphity.titan.model.UserProxy;
 import de.uniko.sebschlicht.graphity.titan.model.VersionedEdge;
-import de.uniko.sebschlicht.graphity.titan.requests.ServiceRequestFollow;
-import de.uniko.sebschlicht.graphity.titan.requests.ServiceRequestUnfollow;
+import de.uniko.sebschlicht.graphity.titan.requests.FollowServiceRequest;
+import de.uniko.sebschlicht.graphity.titan.requests.PostServiceRequest;
+import de.uniko.sebschlicht.graphity.titan.requests.UnfollowServiceRequest;
 
 public class ReadOptimizedECGraphity extends TitanGraphity {
 
@@ -20,7 +21,7 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
         super(graphDb);
     }
 
-    public boolean addFollowship(ServiceRequestFollow request) {
+    public boolean addFollowship(FollowServiceRequest request) {
         // try to find the replica node of the user followed
         Vertex vUserFollowed;
         for (Vertex vFollowedReplica : request.getSubscriberVertex()
@@ -79,7 +80,7 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
         return true;
     }
 
-    public boolean removeFollowship(ServiceRequestUnfollow request) {
+    public boolean removeFollowship(UnfollowServiceRequest request) {
         // try to find the replica node of the user followed
         Vertex vUserFollowed, rFollowed = null;
         for (Vertex vFollowedReplica : request.getSubscriberVertex()
@@ -127,6 +128,10 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
             rFollowed.remove();
         }
         return true;
+    }
+
+    public long addStatusUpdate(PostServiceRequest request) {
+
     }
 
     /**

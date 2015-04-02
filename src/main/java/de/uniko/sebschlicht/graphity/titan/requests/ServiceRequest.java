@@ -3,14 +3,14 @@ package de.uniko.sebschlicht.graphity.titan.requests;
 import de.uniko.sebschlicht.socialnet.requests.Request;
 import de.uniko.sebschlicht.socialnet.requests.RequestType;
 
-public abstract class AbstractServiceRequest extends Request {
+public abstract class ServiceRequest extends Request {
 
     /**
      * time stamp of the request accept on server side
      */
     protected long _timestamp;
 
-    protected AbstractServiceRequest(
+    protected ServiceRequest(
             RequestType type) {
         super(type);
     }
