@@ -11,9 +11,11 @@ import de.uniko.sebschlicht.graphity.titan.Walker;
 import de.uniko.sebschlicht.graphity.titan.model.StatusUpdateProxy;
 import de.uniko.sebschlicht.graphity.titan.model.UserProxy;
 import de.uniko.sebschlicht.graphity.titan.model.VersionedEdge;
+import de.uniko.sebschlicht.graphity.titan.requests.FeedServiceRequest;
 import de.uniko.sebschlicht.graphity.titan.requests.FollowServiceRequest;
 import de.uniko.sebschlicht.graphity.titan.requests.PostServiceRequest;
 import de.uniko.sebschlicht.graphity.titan.requests.UnfollowServiceRequest;
+import de.uniko.sebschlicht.socialnet.StatusUpdateList;
 
 public class ReadOptimizedECGraphity extends TitanGraphity {
 
@@ -22,6 +24,7 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
         super(graphDb);
     }
 
+    @Override
     public boolean addFollowship(FollowServiceRequest request) {
         // try to find the replica node of the user followed
         Vertex vUserFollowed;
@@ -81,6 +84,7 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
         return true;
     }
 
+    @Override
     public boolean removeFollowship(UnfollowServiceRequest request) {
         // try to find the replica node of the user followed
         Vertex vUserFollowed, rFollowed = null;
@@ -131,6 +135,7 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
         return true;
     }
 
+    @Override
     public long addStatusUpdate(PostServiceRequest request) {
         // create new status update vertex and fill via proxy
         Vertex crrUpdate = graphDb.addVertex(null);
@@ -146,8 +151,13 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
 
         // update replica layers of the author's followers
         updateReplicaLayers(request.getAuthorVertex(), request.getTimestamp());
-
         return pStatusUpdate.getIdentifier();
+    }
+
+    @Override
+    public StatusUpdateList readStatusUpdates(FeedServiceRequest request) {
+        //FIXME not implemented
+        return null;
     }
 
     /**

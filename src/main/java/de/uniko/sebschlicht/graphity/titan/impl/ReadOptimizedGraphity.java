@@ -13,7 +13,10 @@ import de.uniko.sebschlicht.graphity.titan.model.PostIteratorComparator;
 import de.uniko.sebschlicht.graphity.titan.model.StatusUpdateProxy;
 import de.uniko.sebschlicht.graphity.titan.model.UserPostIterator;
 import de.uniko.sebschlicht.graphity.titan.model.UserProxy;
-import de.uniko.sebschlicht.socialnet.StatusUpdate;
+import de.uniko.sebschlicht.graphity.titan.requests.FeedServiceRequest;
+import de.uniko.sebschlicht.graphity.titan.requests.FollowServiceRequest;
+import de.uniko.sebschlicht.graphity.titan.requests.PostServiceRequest;
+import de.uniko.sebschlicht.graphity.titan.requests.UnfollowServiceRequest;
 import de.uniko.sebschlicht.socialnet.StatusUpdateList;
 
 public class ReadOptimizedGraphity extends TitanGraphity {
@@ -24,18 +27,15 @@ public class ReadOptimizedGraphity extends TitanGraphity {
     }
 
     @Override
-    protected boolean addFollowship(Vertex vFollowing, Vertex vFollowed) {
+    protected boolean addFollowship(FollowServiceRequest request) {
         // try to find the replica node of the user followed
         Vertex vUserFollowed;
-        for (Vertex vFollowedReplica : vFollowing.getVertices(Direction.OUT,
-                EdgeType.FOLLOWS.getLabel())) {
+        for (Vertex vFollowedReplica : request.getSubscriberVertex()
+                .getVertices(Direction.OUT, EdgeType.FOLLOWS.getLabel())) {
             vUserFollowed =
                     Walker.nextVertex(vFollowedReplica,
                             EdgeType.REPLICA.getLabel());
-            if (vUserFollowed == null) {// concurrent graph modification
-                continue;
-            }
-            if (vUserFollowed.equals(vFollowed)) {
+            if (vUserFollowed.equals(request.getFollowedVertex())) {
                 // user is already following this user
                 return false;
             }
@@ -43,16 +43,20 @@ public class ReadOptimizedGraphity extends TitanGraphity {
 
         // create replica
         final Vertex newReplica = graphDb.addVertex(null);
-        vFollowing.addEdge(EdgeType.FOLLOWS.getLabel(), newReplica);
-        newReplica.addEdge(EdgeType.REPLICA.getLabel(), vFollowed);
+        request.getSubscriberVertex().addEdge(EdgeType.FOLLOWS.getLabel(),
+                newReplica);
+        newReplica.addEdge(EdgeType.REPLICA.getLabel(),
+                request.getFollowedVertex());
         // check if followed user is the first in following's ego network
-        if (Walker.nextVertex(vFollowing, EdgeType.GRAPHITY.getLabel()) == null) {
-            vFollowing.addEdge(EdgeType.GRAPHITY.getLabel(), newReplica);
+        if (Walker.nextVertex(request.getSubscriberVertex(),
+                EdgeType.GRAPHITY.getLabel()) == null) {
+            request.getSubscriberVertex().addEdge(EdgeType.GRAPHITY.getLabel(),
+                    newReplica);
         } else {
             // search for insertion index within following replica layer
             final long followedTimestamp = getLastUpdateByReplica(newReplica);
             long crrTimestamp;
-            Vertex prevReplica = vFollowing;
+            Vertex prevReplica = request.getSubscriberVertex();
             Vertex nextReplica = null;
             while (true) {
                 // get next user
@@ -87,7 +91,7 @@ public class ReadOptimizedGraphity extends TitanGraphity {
      * @param followedReplica
      *            replica of the user that will be removed
      */
-    private void removeFromReplicaLayer(final Vertex followedReplica) {
+    protected static void removeFromReplicaLayer(final Vertex followedReplica) {
         final Vertex prev =
                 Walker.previousVertex(followedReplica,
                         EdgeType.GRAPHITY.getLabel());
@@ -111,18 +115,15 @@ public class ReadOptimizedGraphity extends TitanGraphity {
     }
 
     @Override
-    protected boolean removeFollowship(Vertex vFollowing, Vertex vFollowed) {
+    protected boolean removeFollowship(UnfollowServiceRequest request) {
         // find the replica node of the user followed
         Vertex vUserFollowed, vReplica = null;
-        for (Vertex vFollowedReplica : vFollowing.getVertices(Direction.OUT,
-                EdgeType.FOLLOWS.getLabel())) {
+        for (Vertex vFollowedReplica : request.getSubscriberVertex()
+                .getVertices(Direction.OUT, EdgeType.FOLLOWS.getLabel())) {
             vUserFollowed =
                     Walker.nextVertex(vFollowedReplica,
                             EdgeType.REPLICA.getLabel());
-            if (vUserFollowed == null) {//concurrent graph modification
-                continue;
-            }
-            if (vUserFollowed.equals(vFollowed)) {
+            if (vUserFollowed.equals(request.getFollowedVertex())) {
                 vReplica = vFollowedReplica;
                 break;
             }
@@ -141,7 +142,7 @@ public class ReadOptimizedGraphity extends TitanGraphity {
      * @param user
      *            user where changes have occurred
      */
-    private void updateEgoNetworks(final Vertex user) {
+    protected static void updateEgoNetworks(final Vertex user) {
         Vertex followingUser, lastPosterReplica;
         Vertex prevReplica, nextReplica;
         // loop through followers
@@ -151,17 +152,11 @@ public class ReadOptimizedGraphity extends TitanGraphity {
             followingUser =
                     Walker.previousVertex(followedReplica,
                             EdgeType.FOLLOWS.getLabel());
-            if (followingUser == null) {// concurrent graph modifcation
-                continue;
-            }
 
             // bridge user node
             prevReplica =
                     Walker.previousVertex(followedReplica,
                             EdgeType.GRAPHITY.getLabel());
-            if (prevReplica == null) {// concurrent graph modifcation
-                continue;
-            }
 
             if (!prevReplica.equals(followingUser)) {
                 Walker.removeSingleEdge(followedReplica, Direction.IN,
@@ -192,28 +187,25 @@ public class ReadOptimizedGraphity extends TitanGraphity {
     }
 
     @Override
-    protected long addStatusUpdate(Vertex vAuthor, StatusUpdate statusUpdate) {
+    protected long addStatusUpdate(PostServiceRequest request) {
         // create new status update vertex and fill via proxy
         Vertex crrUpdate = graphDb.addVertex(null);
         StatusUpdateProxy pStatusUpdate = new StatusUpdateProxy(crrUpdate);
         //TODO handle service overload
-        pStatusUpdate.initVertex(statusUpdate.getPublished(),
-                statusUpdate.getMessage());
+        pStatusUpdate.initVertex(request.getStatusUpdate().getPublished(),
+                request.getStatusUpdate().getMessage());
 
         // add status update to user (link vertex, update user)
-        UserProxy pAuthor = new UserProxy(vAuthor);
+        UserProxy pAuthor = new UserProxy(request.getAuthorVertex());
         pAuthor.addStatusUpdate(pStatusUpdate);
 
         // update ego networks of status update author followers
-        updateEgoNetworks(vAuthor);
-
+        updateEgoNetworks(request.getAuthorVertex());
         return pStatusUpdate.getIdentifier();
     }
 
     @Override
-    protected StatusUpdateList readStatusUpdates(
-            Vertex vReader,
-            int numStatusUpdates) {
+    protected StatusUpdateList readStatusUpdates(FeedServiceRequest request) {
         StatusUpdateList statusUpdates = new StatusUpdateList();
         final TreeSet<UserPostIterator> postIterators =
                 new TreeSet<UserPostIterator>(new PostIteratorComparator());
@@ -222,7 +214,8 @@ public class ReadOptimizedGraphity extends TitanGraphity {
         UserProxy pCrrUser = null;
         UserPostIterator userPostIterator;
         Vertex vReplica =
-                Walker.nextVertex(vReader, EdgeType.GRAPHITY.getLabel());
+                Walker.nextVertex(request.getUserVertex(),
+                        EdgeType.GRAPHITY.getLabel());
         if (vReplica != null) {
             pCrrUser =
                     new UserProxy(Walker.nextVertex(vReplica,
@@ -237,6 +230,7 @@ public class ReadOptimizedGraphity extends TitanGraphity {
 
         // handle user queue
         UserProxy pPrevUser = pCrrUser;
+        int numStatusUpdates = request.getFeedLength();
         while (statusUpdates.size() < numStatusUpdates
                 && !postIterators.isEmpty()) {
             // add last recent status update
