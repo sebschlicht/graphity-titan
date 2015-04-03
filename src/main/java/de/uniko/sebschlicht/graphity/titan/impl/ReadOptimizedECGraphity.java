@@ -156,6 +156,10 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
 
     @Override
     public StatusUpdateList readStatusUpdates(FeedServiceRequest request) {
+        StatusUpdateList statusUpdates = new StatusUpdateList();
+        if (request.getUserVertex() == null) {
+            return statusUpdates;
+        }
         //FIXME not implemented
         return null;
     }

@@ -13,7 +13,10 @@ import de.uniko.sebschlicht.graphity.titan.model.PostIteratorComparator;
 import de.uniko.sebschlicht.graphity.titan.model.StatusUpdateProxy;
 import de.uniko.sebschlicht.graphity.titan.model.UserPostIterator;
 import de.uniko.sebschlicht.graphity.titan.model.UserProxy;
-import de.uniko.sebschlicht.socialnet.StatusUpdate;
+import de.uniko.sebschlicht.graphity.titan.requests.FeedServiceRequest;
+import de.uniko.sebschlicht.graphity.titan.requests.FollowServiceRequest;
+import de.uniko.sebschlicht.graphity.titan.requests.PostServiceRequest;
+import de.uniko.sebschlicht.graphity.titan.requests.UnfollowServiceRequest;
 import de.uniko.sebschlicht.socialnet.StatusUpdateList;
 
 public class WriteOptimizedGraphity extends TitanGraphity {
@@ -24,27 +27,29 @@ public class WriteOptimizedGraphity extends TitanGraphity {
     }
 
     @Override
-    public boolean addFollowship(Vertex vFollowing, Vertex vFollowed) {
+    public boolean addFollowship(FollowServiceRequest request) {
         // try to find the vertex of the user followed
-        for (Vertex vIsFollowed : vFollowing.getVertices(Direction.OUT,
-                EdgeType.FOLLOWS.getLabel())) {
-            if (vIsFollowed.equals(vFollowed)) {
+        for (Vertex vIsFollowed : request.getSubscriberVertex().getVertices(
+                Direction.OUT, EdgeType.FOLLOWS.getLabel())) {
+            if (vIsFollowed.equals(request.getFollowedVertex())) {
                 return false;
             }
         }
 
         // create star topology
-        vFollowing.addEdge(EdgeType.FOLLOWS.getLabel(), vFollowed);
+        request.getSubscriberVertex().addEdge(EdgeType.FOLLOWS.getLabel(),
+                request.getFollowedVertex());
         return true;
     }
 
     @Override
-    public boolean removeFollowship(Vertex vFollowing, Vertex vFollowed) {
+    public boolean removeFollowship(UnfollowServiceRequest request) {
         // delete the followship if existing
         Edge followship = null;
-        for (Edge follows : vFollowing.getEdges(Direction.OUT,
-                EdgeType.FOLLOWS.getLabel())) {
-            if (follows.getVertex(Direction.IN).equals(vFollowed)) {
+        for (Edge follows : request.getSubscriberVertex().getEdges(
+                Direction.OUT, EdgeType.FOLLOWS.getLabel())) {
+            if (follows.getVertex(Direction.IN).equals(
+                    request.getFollowedVertex())) {
                 followship = follows;
                 break;
             }
@@ -60,27 +65,25 @@ public class WriteOptimizedGraphity extends TitanGraphity {
     }
 
     @Override
-    protected long addStatusUpdate(Vertex vAuthor, StatusUpdate statusUpdate) {
+    protected long addStatusUpdate(PostServiceRequest request) {
         // create new status update vertex and fill via proxy
         Vertex crrUpdate = graphDb.addVertex(null);
         StatusUpdateProxy pStatusUpdate = new StatusUpdateProxy(crrUpdate);
         //TODO handle service overload
-        pStatusUpdate.initVertex(statusUpdate.getPublished(),
-                statusUpdate.getMessage());
+        pStatusUpdate.initVertex(request.getStatusUpdate().getPublished(),
+                request.getStatusUpdate().getMessage());
 
         // add status update to user (link vertex, update user)
-        UserProxy pAuthor = new UserProxy(vAuthor);
+        UserProxy pAuthor = new UserProxy(request.getAuthorVertex());
         pAuthor.addStatusUpdate(pStatusUpdate);
 
         return pStatusUpdate.getIdentifier();
     }
 
     @Override
-    protected StatusUpdateList readStatusUpdates(
-            Vertex vReader,
-            int numStatusUpdates) {
+    protected StatusUpdateList readStatusUpdates(FeedServiceRequest request) {
         StatusUpdateList statusUpdates = new StatusUpdateList();
-        if (vReader == null) {
+        if (request.getUserVertex() == null) {
             return statusUpdates;
         }
         final TreeSet<UserPostIterator> postIterators =
@@ -89,8 +92,8 @@ public class WriteOptimizedGraphity extends TitanGraphity {
         // loop through users followed
         UserProxy pCrrUser;
         UserPostIterator postIterator;
-        for (Vertex vFollowed : vReader.getVertices(Direction.OUT,
-                EdgeType.FOLLOWS.getLabel())) {
+        for (Vertex vFollowed : request.getUserVertex().getVertices(
+                Direction.OUT, EdgeType.FOLLOWS.getLabel())) {
             // add post iterator
             pCrrUser = new UserProxy(vFollowed);
             postIterator = new UserPostIterator(pCrrUser);
@@ -101,6 +104,7 @@ public class WriteOptimizedGraphity extends TitanGraphity {
         }
 
         // handle queue
+        int numStatusUpdates = request.getFeedLength();
         while ((statusUpdates.size() < numStatusUpdates)
                 && !postIterators.isEmpty()) {
             // add last recent status update

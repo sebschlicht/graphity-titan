@@ -207,6 +207,9 @@ public class ReadOptimizedGraphity extends TitanGraphity {
     @Override
     protected StatusUpdateList readStatusUpdates(FeedServiceRequest request) {
         StatusUpdateList statusUpdates = new StatusUpdateList();
+        if (request.getUserVertex() == null) {
+            return statusUpdates;
+        }
         final TreeSet<UserPostIterator> postIterators =
                 new TreeSet<UserPostIterator>(new PostIteratorComparator());
 
@@ -289,9 +292,6 @@ public class ReadOptimizedGraphity extends TitanGraphity {
     private static long getLastUpdateByReplica(final Vertex userReplica) {
         final Vertex user =
                 Walker.nextVertex(userReplica, EdgeType.REPLICA.getLabel());
-        if (user == null) {// concurrent graph modification
-            return 0;
-        }
         UserProxy pUser = new UserProxy(user);
         return pUser.getLastPostTimestamp();
     }
