@@ -70,6 +70,26 @@ public abstract class Walker {
     }
 
     /**
+     * Walks backwards along the most recent edge of an edge type to the
+     * previous vertex.
+     * 
+     * @param sourceVertex
+     *            vertex to start from
+     * @param edgeLabel
+     *            label of the edge to walk along
+     * @return vertex the most recent edge specified directs from<br>
+     *         <b>null</b> - if the start vertex has no such edge directing in
+     */
+    public static Vertex previousMostRecentVertex(
+            Vertex sourceVertex,
+            String edgeLabel) {
+        VersionedEdge mostRecentEdge =
+                getMostRecentEdge(sourceVertex, Direction.IN, edgeLabel);
+        return (mostRecentEdge != null) ? mostRecentEdge.getEdge().getVertex(
+                Direction.OUT) : null;
+    }
+
+    /**
      * Removes the first edge matching the given criteria retrieved by
      * <i>getEdges</i>.
      * 

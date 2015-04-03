@@ -17,6 +17,10 @@ import de.uniko.sebschlicht.graphity.exception.UnknownFollowedIdException;
 import de.uniko.sebschlicht.graphity.exception.UnknownFollowingIdException;
 import de.uniko.sebschlicht.graphity.exception.UnknownReaderIdException;
 import de.uniko.sebschlicht.graphity.titan.model.UserProxy;
+import de.uniko.sebschlicht.graphity.titan.requests.FeedServiceRequest;
+import de.uniko.sebschlicht.graphity.titan.requests.FollowServiceRequest;
+import de.uniko.sebschlicht.graphity.titan.requests.PostServiceRequest;
+import de.uniko.sebschlicht.graphity.titan.requests.UnfollowServiceRequest;
 import de.uniko.sebschlicht.socialnet.StatusUpdate;
 import de.uniko.sebschlicht.socialnet.StatusUpdateList;
 
@@ -195,21 +199,15 @@ public abstract class TitanGraphity extends Graphity {
     @Override
     public boolean addFollowship(String idFollowing, String idFollowed)
             throws IllegalUserIdException {
-        return addFollowship(idFollowing, idFollowed, true);
-    }
-
-    public boolean addFollowship(
-            String idFollowing,
-            String idFollowed,
-            boolean autoCommit) throws IllegalUserIdException {
         try {
-            //TODO can not create locks manually, but we could force lock via write access
             Vertex vFollowing = loadUser(idFollowing);
             Vertex vFollowed = loadUser(idFollowed);
-            if (addFollowship(vFollowing, vFollowed)) {
-                if (autoCommit) {
-                    graphDb.commit();
-                }
+
+            FollowServiceRequest request = new FollowServiceRequest();
+            request.setSubscriberVertex(vFollowing);
+            request.setFollowedVertex(vFollowed);
+            if (addFollowship(request)) {
+                graphDb.commit();
                 return true;
             }
             // no changes to commit/roll back
@@ -226,28 +224,17 @@ public abstract class TitanGraphity extends Graphity {
     /**
      * Adds a followship between two user vertices to the social network graph.
      * 
-     * @param vFollowing
-     *            vertex of the user that wants to follow another user
-     * @param vFollowed
-     *            vertex of the user that will be followed
+     * @param request
+     *            follow service request object
      * @return true - if the followship was successfully created<br>
      *         false - if this followship is already existing
      */
-    abstract protected boolean
-        addFollowship(Vertex vFollowing, Vertex vFollowed);
+    abstract protected boolean addFollowship(FollowServiceRequest request);
 
     @Override
     public boolean removeFollowship(String idFollowing, String idFollowed)
             throws UnknownFollowingIdException, UnknownFollowedIdException,
             IllegalUserIdException {
-        return removeFollowship(idFollowing, idFollowed, true);
-    }
-
-    public boolean removeFollowship(
-            String idFollowing,
-            String idFollowed,
-            boolean autoCommit) throws UnknownFollowingIdException,
-            UnknownFollowedIdException, IllegalUserIdException {
         try {
             Vertex vFollowing = findUser(idFollowing);
             if (vFollowing == null) {
@@ -258,12 +245,11 @@ public abstract class TitanGraphity extends Graphity {
                 throw new UnknownFollowedIdException(idFollowed);
             }
 
-            //TODO can not create locks manually, but we could force lock via write access
-
-            if (removeFollowship(vFollowing, vFollowed)) {
-                if (autoCommit) {
-                    graphDb.commit();
-                }
+            UnfollowServiceRequest request = new UnfollowServiceRequest();
+            request.setSubscriberVertex(vFollowing);
+            request.setFollowedVertex(vFollowed);
+            if (removeFollowship(request)) {
+                graphDb.commit();
                 return true;
             }
             // no changes to commit/roll back
@@ -281,51 +267,39 @@ public abstract class TitanGraphity extends Graphity {
      * Removes a followship between two user vertices from the social network
      * graph.
      * 
-     * @param vFollowing
-     *            vertex of the user that wants to unfollow a user
-     * @param vFollowed
-     *            vertex of the user that will be unfollowed
+     * @param request
+     *            unfollow service request object
      * @return true - if the followship was successfully removed<br>
      *         false - if this followship is not existing
      */
-    abstract protected boolean removeFollowship(
-            Vertex vFollowing,
-            Vertex vFollowed);
+    abstract protected boolean removeFollowship(UnfollowServiceRequest request);
 
     @Override
     public long addStatusUpdate(String idAuthor, String message)
             throws IllegalUserIdException {
-        return addStatusUpdate(idAuthor, message, true);
-    }
-
-    public long addStatusUpdate(
-            String idAuthor,
-            String message,
-            boolean autoCommit) throws IllegalUserIdException {
         Vertex vAuthor = loadUser(idAuthor);
-        //TODO can not create locks manually, but we could force lock via write access
+
+        PostServiceRequest request = new PostServiceRequest();
+        request.setAuthorVertex(vAuthor);
         StatusUpdate statusUpdate =
-                new StatusUpdate(idAuthor, System.currentTimeMillis(), message);
-        long idStatusUpdate = addStatusUpdate(vAuthor, statusUpdate);
-        if (autoCommit && idStatusUpdate != 0) {
+                new StatusUpdate(idAuthor, request.getTimestamp(), message);
+        request.setStatusUpdate(statusUpdate);
+        long idStatusUpdate = addStatusUpdate(request);
+        if (idStatusUpdate != 0) {
             graphDb.commit();
+            return idStatusUpdate;
         }
-        // nothing to commit/roll back
-        return idStatusUpdate;
+        return 0;
     }
 
     /**
      * Adds a status update vertex to the social network.
      * 
-     * @param vAuthor
-     *            user vertex of the status update author
-     * @param statusUpdate
-     *            status update data
+     * @param request
+     *            post service request object
      * @return identifier of the status update vertex
      */
-    abstract protected long addStatusUpdate(
-            Vertex vAuthor,
-            StatusUpdate statusUpdate);
+    abstract protected long addStatusUpdate(PostServiceRequest request);
 
     @Override
     public StatusUpdateList readStatusUpdates(
@@ -333,15 +307,27 @@ public abstract class TitanGraphity extends Graphity {
             int numStatusUpdates) throws UnknownReaderIdException,
             IllegalUserIdException {
         Vertex vReader = findUser(idReader);
+
+        FeedServiceRequest request = new FeedServiceRequest();
+        request.setUserVertex(vReader);
+        request.setFeedLength(numStatusUpdates);
         if (vReader != null) {
-            return readStatusUpdates(vReader, numStatusUpdates);
+            return readStatusUpdates(request);
         }
         throw new UnknownReaderIdException(idReader);
     }
 
+    /**
+     * Retrieves the news feed for a user of the social network.
+     * The news feed will contain news items of users followed by the user
+     * passed, sorted by time.
+     * 
+     * @param request
+     *            feed service request object
+     * @return news feed of the user, sorted by time
+     */
     abstract protected StatusUpdateList readStatusUpdates(
-            Vertex vReader,
-            int numStatusUpdates);
+            FeedServiceRequest request);
 
     public static void setTitanId(byte titanId) {
         TITAN_ID = titanId;

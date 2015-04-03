@@ -4,14 +4,13 @@ import com.tinkerpop.blueprints.Vertex;
 
 import de.uniko.sebschlicht.socialnet.requests.RequestType;
 
-public class ServiceRequestFollow extends AbstractServiceRequest {
+public class FollowServiceRequest extends ServiceRequest {
 
     protected Vertex _vSubscriber;
 
     protected Vertex _vFollowed;
 
-    protected ServiceRequestFollow(
-            RequestType type) {
+    public FollowServiceRequest() {
         super(RequestType.FOLLOW);
     }
 
@@ -29,10 +28,5 @@ public class ServiceRequestFollow extends AbstractServiceRequest {
 
     public Vertex getFollowedVertex() {
         return _vFollowed;
-    }
-
-    @Override
-    public String[] toStringArray() {
-        return null;
     }
 }

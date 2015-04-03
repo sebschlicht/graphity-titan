@@ -1,14 +1,14 @@
 g = rexster.getGraph("graph")
 mgmt = g.getManagementSystem()
-//time = mgmt.makePropertyKey('timestamp').dataType(Long.class).make()
+time = mgmt.makePropertyKey('timestamp').dataType(Long.class).make()
 mgmt.makeEdgeLabel("e_published").multiplicity(Multiplicity.SIMPLE).make()
 mgmt.makeEdgeLabel("e_follows").multiplicity(Multiplicity.MULTI).make()
-graphity = mgmt.makeEdgeLabel("e_graphity").multiplicity(Multiplicity.SIMPLE).make()
+graphity = mgmt.makeEdgeLabel("e_graphity").multiplicity(Multiplicity.MULTI).make()
 mgmt.makeEdgeLabel("e_replica").multiplicity(Multiplicity.MULTI).make()
 mgmt.makePropertyKey("last_post").dataType(Long.class).make()
 mgmt.makePropertyKey("published").dataType(Long.class).make()
 mgmt.makePropertyKey("message").dataType(String.class).make()
 pkId = mgmt.makePropertyKey("identifier").dataType(Long.class).make()
 mgmt.buildIndex("user.id", Vertex.class).addKey(pkId).unique().buildCompositeIndex()
-//mgmt.buildEdgeIndex(graphity, 'versionedGraphity', Direction.OUT, Order.DESC, time);
+mgmt.buildEdgeIndex(graphity, 'versionedGraphity', Direction.OUT, Order.DESC, time);
 mgmt.commit()
