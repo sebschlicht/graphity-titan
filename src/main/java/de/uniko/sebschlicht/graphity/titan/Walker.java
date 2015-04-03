@@ -139,6 +139,9 @@ public abstract class Walker {
         //TODO should we use vertex-centric indices?
         VersionedEdge mostRecentEdge = null;
         for (Edge edge : sourceVertex.getEdges(direction, edgeLabel)) {
+            if (edge == null) {//FIXME WTF!
+                continue;
+            }
             if (mostRecentEdge == null) {// first edge
                 mostRecentEdge = new VersionedEdge(edge);
             } else {// n-th edge
