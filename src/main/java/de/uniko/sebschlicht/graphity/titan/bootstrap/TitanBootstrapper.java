@@ -7,11 +7,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.thinkaurelius.titan.core.EdgeLabel;
 import com.thinkaurelius.titan.core.Multiplicity;
+import com.thinkaurelius.titan.core.Order;
 import com.thinkaurelius.titan.core.PropertyKey;
 import com.thinkaurelius.titan.core.TitanFactory;
 import com.thinkaurelius.titan.core.TitanGraph;
 import com.thinkaurelius.titan.core.schema.TitanManagement;
+import com.tinkerpop.blueprints.Direction;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.util.wrappers.batch.BatchGraph;
 import com.tinkerpop.blueprints.util.wrappers.batch.VertexIDType;
@@ -21,6 +24,7 @@ import de.uniko.sebschlicht.graphity.bootstrap.User;
 import de.uniko.sebschlicht.graphity.titan.EdgeType;
 import de.uniko.sebschlicht.graphity.titan.model.StatusUpdateProxy;
 import de.uniko.sebschlicht.graphity.titan.model.UserProxy;
+import de.uniko.sebschlicht.graphity.titan.model.VersionedEdge;
 
 public class TitanBootstrapper extends BootstrapClient {
 
@@ -42,12 +46,16 @@ public class TitanBootstrapper extends BootstrapClient {
                     .multiplicity(Multiplicity.SIMPLE).make();
             mgmt.makeEdgeLabel(EdgeType.FOLLOWS.getLabel())
                     .multiplicity(Multiplicity.MULTI).make();
-            mgmt.makeEdgeLabel(EdgeType.GRAPHITY.getLabel())
-                    .multiplicity(Multiplicity.SIMPLE).make();
+            EdgeLabel graphity =
+                    mgmt.makeEdgeLabel(EdgeType.GRAPHITY.getLabel())
+                            .multiplicity(Multiplicity.MULTI).make();
             mgmt.makeEdgeLabel(EdgeType.REPLICA.getLabel())
                     .multiplicity(Multiplicity.MULTI).make();
 
             // create vertex properties and indices
+            PropertyKey time =
+                    mgmt.makePropertyKey(VersionedEdge.PROP_TIMESTAMP)
+                            .dataType(Long.class).make();
             PropertyKey userIdKey =
                     mgmt.makePropertyKey(UserProxy.PROP_IDENTIFIER)
                             .dataType(Long.class).make();
@@ -61,7 +69,9 @@ public class TitanBootstrapper extends BootstrapClient {
             // create user identifier index
             mgmt.buildIndex("user.id", Vertex.class).addKey(userIdKey).unique()
                     .buildCompositeIndex();
-
+            // create Graphity version edges
+            mgmt.buildEdgeIndex(graphity, "versionedGraphity", Direction.OUT,
+                    Order.DESC, time);
             mgmt.commit();
         } catch (Exception e) {
             System.out.println("Graph schema was not created.");
