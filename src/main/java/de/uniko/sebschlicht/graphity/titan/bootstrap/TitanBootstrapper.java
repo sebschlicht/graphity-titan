@@ -91,12 +91,11 @@ public class TitanBootstrapper extends BootstrapClient {
     protected long createUsers() {
         long numUsers = 0, nodeId;
         Vertex vertex;
-        Map<String, Object> userProperties;
+        Map<String, Object> userProperties = new HashMap<>();
         ArrayList<User> tmp = new ArrayList<>();
         Map<String, Object> noprops = new HashMap<>();
         for (User user : _users.getUsers()) {
-            userProperties = new HashMap<>();
-            userProperties.put(UserProxy.PROP_IDENTIFIER, user.getId());
+            userProperties.put(UserProxy.PROP_IDENTIFIER, user.getId());// override previous value, if any
             vertex = _batchGraph.addVertex(_vertexId++, userProperties);
             nodeId = (long) vertex.getId();
             user.setNodeId(nodeId);

@@ -1,5 +1,7 @@
 package de.uniko.sebschlicht.graphity.titan.impl;
 
+import java.util.TreeSet;
+
 import com.thinkaurelius.titan.core.TitanGraph;
 import com.tinkerpop.blueprints.Direction;
 import com.tinkerpop.blueprints.Edge;
@@ -8,7 +10,9 @@ import com.tinkerpop.blueprints.Vertex;
 import de.uniko.sebschlicht.graphity.titan.EdgeType;
 import de.uniko.sebschlicht.graphity.titan.TitanGraphity;
 import de.uniko.sebschlicht.graphity.titan.Walker;
+import de.uniko.sebschlicht.graphity.titan.model.PostIteratorComparator;
 import de.uniko.sebschlicht.graphity.titan.model.StatusUpdateProxy;
+import de.uniko.sebschlicht.graphity.titan.model.UserPostIterator;
 import de.uniko.sebschlicht.graphity.titan.model.UserProxy;
 import de.uniko.sebschlicht.graphity.titan.model.VersionedEdge;
 import de.uniko.sebschlicht.graphity.titan.requests.FeedServiceRequest;
@@ -160,8 +164,83 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
         if (request.getUserVertex() == null) {
             return statusUpdates;
         }
-        //FIXME not implemented
-        return null;
+        final TreeSet<UserPostIterator> postIterators =
+                new TreeSet<UserPostIterator>(new PostIteratorComparator());
+
+        // load first user by replica
+        UserProxy pCrrUser = null;
+        UserPostIterator userPostIterator;
+        /*
+         * walk along the most recent Graphity edge
+         */
+        Vertex vReplica =
+                Walker.nextMostRecentVertex(request.getUserVertex(),
+                        EdgeType.GRAPHITY.getLabel());
+        if (vReplica != null) {
+            pCrrUser =
+                    new UserProxy(Walker.nextVertex(vReplica,
+                            EdgeType.REPLICA.getLabel()));
+            /*
+             * The replica node may be unconnected to the user, see
+             * {@link #getLastUpdateByReplica}.
+             * This would leave the user post iterator set empty.
+             */
+            if (pCrrUser != null) {
+                userPostIterator = new UserPostIterator(pCrrUser);
+                userPostIterator.setReplicaVertex(vReplica);
+
+                if (userPostIterator.hasNext()) {
+                    postIterators.add(userPostIterator);
+                }
+            }
+        }
+
+        // handle user queue
+        UserProxy pPrevUser = pCrrUser;
+        int numStatusUpdates = request.getFeedLength();
+        while (statusUpdates.size() < numStatusUpdates
+                && !postIterators.isEmpty()) {
+            // add last recent status update
+            userPostIterator = postIterators.pollLast();
+            statusUpdates.add(userPostIterator.next().getStatusUpdate());
+
+            // re-add iterator if not empty
+            if (userPostIterator.hasNext()) {
+                postIterators.add(userPostIterator);
+            }
+
+            // load additional user if necessary
+            if (userPostIterator.getUser() == pPrevUser) {
+                vReplica =
+                        Walker.nextMostRecentVertex(
+                                userPostIterator.getReplicaVertex(),
+                                EdgeType.GRAPHITY.getLabel());
+                // check if additional user existing
+                if (vReplica != null) {
+                    Vertex vCrrUser =
+                            Walker.nextVertex(vReplica,
+                                    EdgeType.REPLICA.getLabel());
+                    if (vCrrUser != null) {
+                        pCrrUser = new UserProxy(vCrrUser);
+                        userPostIterator = new UserPostIterator(pCrrUser);
+                        userPostIterator.setReplicaVertex(vReplica);
+                        // check if user has status updates
+                        if (userPostIterator.hasNext()) {
+                            postIterators.add(userPostIterator);
+                            pPrevUser = pCrrUser;
+                        } else {
+                            // further users do not need to be loaded
+                            pPrevUser = null;
+                        }
+                    } else {//TODO the replica is unconnected, just ignore or break out?
+                        // further users do not need to be loaded
+                        pPrevUser = null;
+                    }
+                }
+            }
+        }
+
+        return statusUpdates;
     }
 
     /**
