@@ -1,7 +1,7 @@
-cluster.max-partitions=128
-ids.block-size=100000
+ids.block-size=500000
 schema.default=none
 storage.backend=cassandra
 storage.batch-loading=true
+storage.buffer-size=100000
 storage.cassandra.replication-factor=1
 storage.hostname=127.0.0.1
