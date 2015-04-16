@@ -147,11 +147,28 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
         //TODO handle service overload
         pStatusUpdate.initVertex(request.getStatusUpdate().getPublished(),
                 request.getStatusUpdate().getMessage());
-        //FIXME do we need EC algorithms for proxy algorithms, too?
 
         // add status update to author (link vertex, update user)
         UserProxy pAuthor = new UserProxy(request.getAuthorVertex());
+
+        /**
+         * update author's news item list
+         */
+        // get last recent news item
+        Vertex lastUpdate =
+                Walker.nextVertex(pAuthor.getVertex(),
+                        EdgeType.PUBLISHED.getLabel());
+        // update references to previous news item (if existing)
+        if (lastUpdate != null) {
+            Walker.removeSingleEdge(pAuthor.getVertex(), Direction.OUT,
+                    EdgeType.PUBLISHED.getLabel());
+            crrUpdate.addEdge(EdgeType.PUBLISHED.getLabel(), lastUpdate);
+        }
+        // link from user to news item vertex
+        pAuthor.getVertex().addEdge(EdgeType.PUBLISHED.getLabel(), crrUpdate);
+        pAuthor.setLastPostTimestamp(request.getStatusUpdate().getPublished());
         pAuthor.addStatusUpdate(pStatusUpdate);
+        pStatusUpdate.setAuthor(pAuthor);
 
         // update replica layers of the author's followers
         updateReplicaLayers(request.getAuthorVertex(), request.getTimestamp());
@@ -292,6 +309,7 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
                 } else {
                     crrTimestamp = 0;
                 }
+                //FIXME may lead to an endless loop if GRAPHITY labels form a loop
             } while (crrTimestamp > followedTimestamp);
 
             // re-link next replica in replica layer, if existing
@@ -303,7 +321,7 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
                  * We remove the most recent one and repair on-read.
                  */
                 Walker.removeMostRecentEdge(prevReplica, Direction.OUT,
-                        EdgeType.GRAPHITY.getLabel());
+                        EdgeType.GRAPHITY.getLabel(), timestamp);
                 Edge eCrr =
                         rFollowed.addEdge(EdgeType.GRAPHITY.getLabel(),
                                 crrReplica);
@@ -361,10 +379,10 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
 
         // bridge the user replica in the replica layer
         Walker.removeMostRecentEdge(prev, Direction.OUT,
-                EdgeType.GRAPHITY.getLabel());
+                EdgeType.GRAPHITY.getLabel(), timestamp);
         if (next != null) {
             Walker.removeMostRecentEdge(next, Direction.IN,
-                    EdgeType.GRAPHITY.getLabel());
+                    EdgeType.GRAPHITY.getLabel(), timestamp);
             Edge edge = prev.addEdge(EdgeType.GRAPHITY.getLabel(), next);
             VersionedEdge verEdge = new VersionedEdge(edge);
             verEdge.setTimestamp(timestamp);
@@ -431,7 +449,7 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
                  * We remove the most recent one.
                  */
                 Walker.removeMostRecentEdge(rFollowed, Direction.IN,
-                        EdgeType.GRAPHITY.getLabel());
+                        EdgeType.GRAPHITY.getLabel(), timestamp);
                 /*
                  * There might be multiple GRAPHITY edges due to concurrent
                  * requests.
@@ -447,7 +465,7 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
                      * We remove the most recent one.
                      */
                     Walker.removeMostRecentEdge(rFollowed, Direction.OUT,
-                            EdgeType.GRAPHITY.getLabel());
+                            EdgeType.GRAPHITY.getLabel(), timestamp);
                     /*
                      * Reconnect the next replica with a new versioned GRAPHITY
                      * edge.
@@ -474,7 +492,7 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
                      * We remove the most recent one.
                      */
                     Walker.removeMostRecentEdge(vSubscriber, Direction.OUT,
-                            EdgeType.GRAPHITY.getLabel());
+                            EdgeType.GRAPHITY.getLabel(), timestamp);
                     /*
                      * Reconnect the previous replica with a new versioned
                      * GRAPHITY edge.

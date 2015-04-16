@@ -120,14 +120,19 @@ public abstract class Walker {
      *            direction the edge has for source vertex
      * @param edgeLabel
      *            label of the edge to remove
+     * @param timestamp
+     *            request time stamp (edges with a higher time stamp won't be
+     *            removed)
      */
     public static void removeMostRecentEdge(
             Vertex sourceVertex,
             Direction direction,
-            String edgeLabel) {
+            String edgeLabel,
+            long timestamp) {
         VersionedEdge mostRecentEdge =
                 getMostRecentEdge(sourceVertex, direction, edgeLabel);
-        if (mostRecentEdge != null) {
+        if (mostRecentEdge != null
+                && (mostRecentEdge.getTimestamp() < timestamp)) {
             mostRecentEdge.getEdge().remove();
         }
     }
