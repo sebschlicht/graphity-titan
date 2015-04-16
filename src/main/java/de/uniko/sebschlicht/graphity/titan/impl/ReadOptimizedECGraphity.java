@@ -177,15 +177,16 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
                 Walker.nextMostRecentVertex(request.getUserVertex(),
                         EdgeType.GRAPHITY.getLabel());
         if (vReplica != null) {
-            pCrrUser =
-                    new UserProxy(Walker.nextVertex(vReplica,
-                            EdgeType.REPLICA.getLabel()));
+            Vertex vUser =
+                    Walker.nextVertex(vReplica, EdgeType.REPLICA.getLabel());
+
             /*
              * The replica node may be unconnected to the user, see
              * {@link #getLastUpdateByReplica}.
              * This would leave the user post iterator set empty.
              */
-            if (pCrrUser != null) {
+            if (vUser != null) {
+                pCrrUser = new UserProxy(vUser);
                 userPostIterator = new UserPostIterator(pCrrUser);
                 userPostIterator.setReplicaVertex(vReplica);
 
@@ -232,7 +233,7 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
                             // further users do not need to be loaded
                             pPrevUser = null;
                         }
-                    } else {//TODO the replica is unconnected, just ignore or break out?
+                    } else {//TODO the replica is unconnected, just ignore or keep breaking out?
                         // further users do not need to be loaded
                         pPrevUser = null;
                     }

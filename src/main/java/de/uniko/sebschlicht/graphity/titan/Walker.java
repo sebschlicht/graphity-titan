@@ -48,7 +48,7 @@ public abstract class Walker {
         VersionedEdge mostRecentEdge =
                 getMostRecentEdge(sourceVertex, Direction.OUT, edgeLabel);
         return (mostRecentEdge != null) ? mostRecentEdge.getEdge().getVertex(
-                Direction.IN) : null;
+                Direction.IN) : null;// should this be OUT?
     }
 
     /**
@@ -86,7 +86,7 @@ public abstract class Walker {
         VersionedEdge mostRecentEdge =
                 getMostRecentEdge(sourceVertex, Direction.IN, edgeLabel);
         return (mostRecentEdge != null) ? mostRecentEdge.getEdge().getVertex(
-                Direction.OUT) : null;
+                Direction.OUT) : null;// should this be IN?
     }
 
     /**
