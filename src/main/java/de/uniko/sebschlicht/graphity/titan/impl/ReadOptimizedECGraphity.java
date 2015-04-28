@@ -129,8 +129,11 @@ public class ReadOptimizedECGraphity extends TitanGraphity {
         Vertex prev = vUser;
         while (!replicaLayer.isEmpty()) {
             UserProxy followed = replicaLayer.pollLast();
-            prev.addEdge(EdgeType.GRAPHITY.getLabel(),
-                    followed.getReplicaVertex());
+            Edge edge =
+                    prev.addEdge(EdgeType.GRAPHITY.getLabel(),
+                            followed.getReplicaVertex());
+            VersionedEdge verEdge = new VersionedEdge(edge);
+            verEdge.setTimestamp(timestamp);
             prev = followed.getReplicaVertex();
         }
     }
