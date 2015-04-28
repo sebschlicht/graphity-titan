@@ -14,6 +14,11 @@ public class UserProxy extends SocialItemProxy {
     public static final String PROP_LAST_STREAM_UDPATE = "last_post";
 
     /**
+     * replica vertex
+     */
+    protected Vertex _vReplica;
+
+    /**
      * (optional) last recent status update posted by this user
      */
     protected StatusUpdateProxy lastPost;
@@ -27,6 +32,14 @@ public class UserProxy extends SocialItemProxy {
             Vertex vUser) {
         super(vUser);
         _lastPostTimestamp = -1;
+    }
+
+    public void setReplicaVertex(Vertex vReplica) {
+        _vReplica = vReplica;
+    }
+
+    public Vertex getReplicaVertex() {
+        return _vReplica;
     }
 
     public void setLastPostTimestamp(long lastPostTimestamp) {
